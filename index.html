@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kai XSS Lab — Stored Cross-Site Scripting, Explained Safely | Prince Hirwa</title>
+<meta name="description" content="An interactive, sandboxed lab that shows how stored XSS works and how output encoding, sanitizing and Content-Security-Policy stop it. By Prince Hirwa Rutagengwa (Kai Labs)." />
+<meta name="theme-color" content="#05070a" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+:root{--bg:#05070a;--panel:#0b0f16;--panel2:#0f1520;--line:rgba(120,255,190,.14);--line2:rgba(120,255,190,.32);--text:#e7f2ec;--muted:#8a9a93;--green:#3dff9e;--cyan:#5ad1ff;--red:#ff4d6d;--amber:#ffc24d;--violet:#a78bfa;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(900px 500px at 85% -10%,rgba(61,255,158,.10),transparent 60%),radial-gradient(800px 500px at -10% 30%,rgba(90,209,255,.08),transparent 60%);z-index:-1}
+a{color:var(--cyan)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:6px}
+.wrap{width:min(1240px,94vw);margin:0 auto}
+code,kbd,.mono{font-family:var(--mono)}
+
+/* top */
+nav{display:flex;justify-content:space-between;align-items:center;padding:18px 0}
+.brand{font-family:var(--mono);font-weight:600;letter-spacing:.06em;display:flex;gap:10px;align-items:center}
+.brand i{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+.back{border:1px solid var(--line2);border-radius:999px;padding:9px 16px;text-decoration:none;color:var(--text);font-size:.85rem}
+header.hero{padding:50px 0 30px}
+.tag{font-family:var(--mono);font-size:.78rem;color:var(--green);letter-spacing:.14em;text-transform:uppercase}
+h1{font-family:"Space Grotesk";font-size:clamp(2.4rem,6vw,4.6rem);line-height:1;letter-spacing:-.02em;margin:14px 0 18px}
+h1 .g{color:var(--green);text-shadow:0 0 30px rgba(61,255,158,.35)}
+h2{font-family:"Space Grotesk";font-size:clamp(1.6rem,3.4vw,2.4rem);line-height:1.1;margin:10px 0 14px}
+.lead{color:var(--muted);font-size:1.06rem;max-width:720px}
+.warn{display:flex;gap:12px;align-items:flex-start;margin-top:24px;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,194,77,.35);background:rgba(255,194,77,.06);font-size:.9rem;max-width:760px}
+.warn b{color:var(--amber)}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:34px 0 10px}
+.step{padding:18px;border-radius:16px;background:var(--panel);border:1px solid var(--line)}
+.step .n{font-family:var(--mono);color:var(--green);font-size:.8rem}
+.step b{display:block;font-family:"Space Grotesk";font-size:1.1rem;margin:6px 0 4px}
+.step p{font-size:.88rem;color:var(--muted)}
+
+/* lab */
+.lab{display:grid;grid-template-columns:1fr 1fr 1.25fr;gap:14px;margin-top:30px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.ph b{font-family:var(--mono);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase}
+.ph .who{font-size:.72rem;color:var(--muted);font-family:var(--mono)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:8px}
+.pb{padding:14px;display:grid;gap:12px;align-content:start}
+label{font-size:.78rem;color:var(--muted);font-family:var(--mono)}
+input[type=text],textarea,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#070a0f;font-size:16px}
+textarea{min-height:110px;resize:vertical;font-family:var(--mono);font-size:.86rem}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--green)}
+.payloads{display:grid;gap:6px}
+.pl{display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.015);font-size:.82rem;min-height:40px}
+.pl:hover{border-color:var(--line2);background:rgba(61,255,158,.05)}
+.pl small{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+.lvl{font-family:var(--mono);font-size:.62rem;padding:2px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.btn{display:inline-flex;justify-content:center;align-items:center;gap:8px;padding:11px 16px;border-radius:11px;font-weight:600;font-size:.9rem;min-height:44px}
+.btn.go{background:var(--green);color:#04140b}
+.btn.go:hover{filter:brightness(1.1)}
+.btn.ghost{border:1px solid var(--line2)}
+.btn.ghost:hover{background:rgba(61,255,158,.06)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.db{font-family:var(--mono);font-size:.76rem;display:grid;gap:6px;max-height:340px;overflow:auto}
+.rec{padding:9px 10px;border-radius:10px;background:#070a0f;border:1px solid var(--line);word-break:break-all}
+.rec .k{color:var(--muted)}
+.rec .v{color:#cfe9dc}
+.rec.bad{border-color:rgba(255,77,109,.45)}
+.rec.bad .flag{color:var(--red)}
+.defs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.def{padding:8px 6px;border-radius:10px;border:1px solid var(--line);font-size:.74rem;text-align:center;line-height:1.25;min-height:44px}
+.def[aria-pressed="true"]{border-color:var(--green);background:rgba(61,255,158,.1);color:#fff}
+.def.none[aria-pressed="true"]{border-color:var(--red);background:rgba(255,77,109,.12)}
+.browser{border-radius:12px;overflow:hidden;border:1px solid var(--line2);background:#fff}
+.bar{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#e9edf2;color:#334;font-family:var(--mono);font-size:.7rem}
+.bar i{width:9px;height:9px;border-radius:50%;background:#c8ced6}
+.bar span{flex:1;background:#fff;border-radius:6px;padding:3px 8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+iframe{display:block;width:100%;height:360px;border:0;background:#fff}
+.status{font-family:var(--mono);font-size:.78rem;padding:8px 10px;border-radius:10px;border:1px solid var(--line)}
+.status.bad{border-color:rgba(255,77,109,.5);color:#ffd0d8;background:rgba(255,77,109,.08)}
+.status.good{border-color:rgba(61,255,158,.5);color:#cbffe4;background:rgba(61,255,158,.06)}
+.status.mid{border-color:rgba(255,194,77,.5);color:#ffe7b8;background:rgba(255,194,77,.06)}
+
+/* log */
+.log{margin-top:14px;background:#030507;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.log .ph{background:#070a0f}
+.lines{font-family:var(--mono);font-size:.78rem;padding:12px 14px;max-height:220px;overflow:auto;display:grid;gap:4px}
+.ln{display:grid;grid-template-columns:70px 1fr;gap:10px}
+.ln time{color:#4d5b55}
+.ln.ok span{color:var(--green)}.ln.bad span{color:var(--red)}.ln.info span{color:var(--cyan)}.ln.mid span{color:var(--amber)}
+
+/* matrix + code */
+section.block{padding:70px 0 10px}
+table{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--panel2)}
+td.y{color:var(--green);font-family:var(--mono)}td.n{color:var(--red);font-family:var(--mono)}td.p{color:var(--amber);font-family:var(--mono)}
+.code{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+pre{background:#030507;border:1px solid var(--line);border-radius:14px;padding:14px;overflow:auto;font-family:var(--mono);font-size:.78rem;line-height:1.6}
+pre .c{color:#56655e}pre .r{color:var(--red)}pre .g{color:var(--green)}
+.cap{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.check{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+.check div{padding:18px;border-radius:16px;background:var(--panel);border:1px solid var(--line)}
+.check b{font-family:"Space Grotesk";display:block;margin-bottom:4px}
+.check p{font-size:.88rem;color:var(--muted)}
+footer{margin-top:70px;padding:30px 0 40px;border-top:1px solid var(--line);color:var(--muted);font-size:.82rem;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+
+@media (max-width:1020px){.lab{grid-template-columns:1fr 1fr}.victim{grid-column:span 2}}
+@media (max-width:720px){
+  .lab,.code,.check{grid-template-columns:1fr}.victim{grid-column:auto}
+  .steps{grid-template-columns:1fr 1fr}
+  .defs{grid-template-columns:1fr 1fr}
+  table{font-size:.78rem}th,td{padding:9px 8px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><div class="brand"><i></i>KAI XSS LAB</div><a class="back" href="https://hprince01.github.io/#portfolio">← Portfolio</a></nav>
+
+  <header class="hero">
+    <span class="tag">// Web security · Interactive lab</span>
+    <h1>Break it safely.<br /><span class="g">Then fix it.</span></h1>
+    <p class="lead">Stored Cross-Site Scripting (XSS) happens when a website saves untrusted input, like a comment, and later shows it to other people without handling it safely. Their browsers then run the attacker’s code. Try it below on a fake comment board, then switch on the defences.</p>
+    <div class="warn"><span>⚠️</span><div><b>Safe by design.</b> The victim’s browser is a sandboxed frame with no access to this page, your cookies or the internet; payloads only change the fake board. Only test websites you own or have written permission to test.</div></div>
+    <div class="steps">
+      <div class="step"><span class="n">01</span><b>Inject</b><p>The attacker posts code instead of a normal comment.</p></div>
+      <div class="step"><span class="n">02</span><b>Store</b><p>The site saves it in its database, unchanged.</p></div>
+      <div class="step"><span class="n">03</span><b>Serve</b><p>Every visitor who opens the page receives that code as part of the HTML.</p></div>
+      <div class="step"><span class="n">04</span><b>Execute</b><p>The visitor’s browser runs it, as if the site itself wrote it.</p></div>
+    </div>
+  </header>
+
+  <!-- ================= LAB ================= -->
+  <div class="lab" id="lab">
+    <!-- attacker -->
+    <div class="panel">
+      <div class="ph"><b><span class="dot" style="background:var(--red)"></span>1 · Attacker</b><span class="who">posts a comment</span></div>
+      <div class="pb">
+        <div><label for="name">Name</label><input type="text" id="name" value="mallory" maxlength="30" /></div>
+        <div><label for="msg">Comment (try HTML)</label><textarea id="msg" spellcheck="false">Great post!</textarea></div>
+        <div class="row"><button class="btn go" id="post">Post comment →</button><button class="btn ghost" id="reset">Reset board</button></div>
+        <div><label>Test payloads (harmless)</label>
+          <div class="payloads" id="payloads"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- database -->
+    <div class="panel">
+      <div class="ph"><b><span class="dot" style="background:var(--amber)"></span>2 · Database</b><span class="who">stored as-is</span></div>
+      <div class="pb">
+        <p style="font-size:.84rem;color:var(--muted)">This is what the server saves. Notice it keeps the raw text; the danger is in how it’s <em>displayed</em> later.</p>
+        <div class="db" id="db" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <!-- victim -->
+    <div class="panel victim">
+      <div class="ph"><b><span class="dot" style="background:var(--green)"></span>3 · Victim’s browser</b><span class="who" id="visitor">visitor: alice</span></div>
+      <div class="pb">
+        <div><label>Defence used when the page renders comments</label>
+          <div class="defs" role="group" aria-label="Defence">
+            <button class="def none" data-d="none" aria-pressed="true">None<br /><small>innerHTML</small></button>
+            <button class="def" data-d="encode" aria-pressed="false">Output<br /><small>encoding</small></button>
+            <button class="def" data-d="sanitize" aria-pressed="false">Sanitizer<br /><small>allowlist</small></button>
+            <button class="def" data-d="csp" aria-pressed="false">CSP<br /><small>+ innerHTML</small></button>
+          </div>
+        </div>
+        <div class="browser">
+          <div class="bar"><i></i><i></i><i></i><span id="url">https://kigali-blog.example/post/42#comments</span></div>
+          <iframe id="victim" title="Sandboxed victim browser showing the comment board" sandbox="allow-scripts"></iframe>
+        </div>
+        <div class="status" id="status">Post a comment to see how it renders.</div>
+        <button class="btn ghost" id="revisit">↻ Visit as another user</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="log">
+    <div class="ph"><b><span class="dot" style="background:var(--cyan)"></span>Security log</b><button class="who" id="clear" style="text-decoration:underline">clear</button></div>
+    <div class="lines" id="log" aria-live="polite"></div>
+  </div>
+
+  <!-- ================= DEFENCES ================= -->
+  <section class="block">
+    <span class="tag">// Results</span>
+    <h2>Which defence stops what?</h2>
+    <p class="lead">Each column is a setting in the lab. Each row is a payload from the list. Try them and compare with this table.</p>
+    <div style="overflow-x:auto"><table id="matrix"><thead><tr><th>Payload</th><th>None</th><th>Output encoding</th><th>Sanitizer</th><th>CSP</th></tr></thead><tbody></tbody></table></div>
+    <p class="lead" style="margin-top:14px;font-size:.92rem"><b style="color:var(--amber)">Key lesson:</b> CSP blocks the <em>scripts</em>, but the page can still be defaced with injected HTML and CSS. Encode or sanitize first, and add CSP as a second layer (defence in depth).</p>
+  </section>
+
+  <section class="block">
+    <span class="tag">// The fix in code</span>
+    <h2>One line makes the difference.</h2>
+    <div class="code">
+      <div><div class="cap" style="color:var(--red)">✗ Vulnerable</div>
+<pre><span class="c">// renders the stored comment as HTML</span>
+comments.forEach(c => {
+  board.innerHTML +=
+    <span class="r">`&lt;p&gt;${c.name}: ${c.text}&lt;/p&gt;`</span>;
+});</pre></div>
+      <div><div class="cap" style="color:var(--green)">✓ Fixed</div>
+<pre><span class="c">// renders it as plain text</span>
+comments.forEach(c => {
+  const p = document.createElement('p');
+  <span class="g">p.textContent = `${c.name}: ${c.text}`;</span>
+  board.append(p);
+});
+<span class="c">// + server header (second layer):</span>
+<span class="g">Content-Security-Policy: script-src 'self'</span></pre></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <span class="tag">// Prevention checklist</span>
+    <h2>How real sites stay safe</h2>
+    <div class="check">
+      <div><b>Encode output</b><p>Treat user content as text, not HTML. Use <code>textContent</code> or your framework’s default escaping (React, Vue and Angular do this by default).</p></div>
+      <div><b>Sanitize rich text</b><p>If users really need formatting, run it through a proven allowlist sanitizer such as DOMPurify. Never write your own regex filter.</p></div>
+      <div><b>Content-Security-Policy</b><p>Block inline scripts and unknown sources, so that one missed bug can’t run code.</p></div>
+      <div><b>Validate input</b><p>Check length, type and format on the server. This reduces attack surface but is not a replacement for encoding.</p></div>
+      <div><b>Protect cookies</b><p>Set session cookies to <code>HttpOnly</code>, <code>Secure</code> and <code>SameSite</code>, so scripts can’t read them.</p></div>
+      <div><b>Avoid dangerous APIs</b><p>Watch for <code>innerHTML</code>, <code>dangerouslySetInnerHTML</code>, <code>v-html</code> and <code>eval</code>. Use them only with sanitized data.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Built by <a href="https://hprince01.github.io/">Prince Hirwa · Kai Labs</a> to learn and teach web security. Vanilla JS, sandboxed iframes, CSP.</span>
+    <span>Learn more: <a href="https://owasp.org/www-community/attacks/xss/" target="_blank" rel="noopener">OWASP: Cross-Site Scripting</a></span>
+  </footer>
+</div>
+
+<script>
+/* ============ harmless demo payloads ============ */
+const PAYLOADS = [
+  { id:'bold',   name:'HTML injection',      lvl:'low',  code:'<b style="color:#c00;font-size:22px">FREE PRIZE!!! click me</b>', note:'Adds markup but runs no code.' },
+  { id:'alert',  name:'Classic alert()',     lvl:'high', code:'<img src="x" onerror="alert(\'XSS on \' + location.hostname)">', note:'A broken image whose error handler runs JavaScript.' },
+  { id:'steal',  name:'Read the session',    lvl:'high', code:'<img src="x" onerror="leak(window.FAKE_SESSION)">', note:'Shows the fake session token an attacker could send away.' },
+  { id:'deface', name:'Deface the page',     lvl:'high', code:'<svg onload="document.body.innerHTML=\'<h1 style=&quot;color:#c00;font-family:sans-serif&quot;>Hacked by mallory</h1>\'"></svg>', note:'Replaces the whole page using an SVG onload handler.' },
+  { id:'script', name:'<script> tag',        lvl:'med',  code:'<script>alert("hi")<\/script>', note:'Script tags added with innerHTML do NOT run, but handlers do.' },
+  { id:'css',    name:'Fake login overlay',  lvl:'med',  code:'<div style="position:fixed;inset:0;background:#fff;display:grid;place-items:center;font-family:sans-serif"><div style="border:1px solid #ccc;padding:20px;border-radius:8px">Session expired.<br>Please log in again ▸</div></div>', note:'No script at all, just HTML/CSS phishing.' },
+];
+const EXPECT = { // what each defence does to each payload
+  bold:  { none:'p', encode:'y', sanitize:'p', csp:'p' },
+  alert: { none:'n', encode:'y', sanitize:'y', csp:'y' },
+  steal: { none:'n', encode:'y', sanitize:'y', csp:'y' },
+  deface:{ none:'n', encode:'y', sanitize:'y', csp:'y' },
+  script:{ none:'y', encode:'y', sanitize:'y', csp:'y' },
+  css:   { none:'n', encode:'y', sanitize:'y', csp:'n' },
+};
+const LABEL = { y:'Blocked', n:'Exploited', p:'Markup only' };
+
+/* ============ state ============ */
+const seed = () => [
+  { name:'alice', text:'Loved this post about Kigali’s tech scene!' },
+  { name:'jean',  text:'Can you share the slides from the meetup?' },
+];
+let db = seed(), defence = 'none', visitors = ['alice','jean','grace','eric','aline'], vi = 0;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const looksBad = s => /<\s*[a-z!\/]|on\w+\s*=|javascript:/i.test(s);
+
+/* ============ log ============ */
+function log(type, msg){
+  const d = new Date(), t = d.toTimeString().slice(0,8);
+  $('log').insertAdjacentHTML('afterbegin', `<div class="ln ${type}"><time>${t}</time><span>${esc(msg)}</span></div>`);
+}
+$('clear').onclick = () => $('log').innerHTML = '';
+
+/* ============ payload buttons + matrix ============ */
+const lvlColor = { low:'var(--cyan)', med:'var(--amber)', high:'var(--red)' };
+$('payloads').innerHTML = PAYLOADS.map(p => `<button class="pl" data-id="${p.id}" title="${esc(p.note)}"><span>${esc(p.name)}<br><small>${esc(p.note)}</small></span><span class="lvl" style="color:${lvlColor[p.lvl]}">${p.lvl}</span></button>`).join('');
+$('payloads').addEventListener('click', e => { const b = e.target.closest('.pl'); if (!b) return; const p = PAYLOADS.find(x => x.id === b.dataset.id); $('msg').value = p.code; $('msg').focus(); log('info', `Loaded payload “${p.name}”. Click “Post comment” to store it.`); });
+document.querySelector('#matrix tbody').innerHTML = PAYLOADS.map(p => `<tr><td>${esc(p.name)}<br><code style="font-size:.7rem;color:var(--muted)">${esc(p.code.slice(0,48))}${p.code.length>48?'…':''}</code></td>${['none','encode','sanitize','csp'].map(d => `<td class="${EXPECT[p.id][d]}">${LABEL[EXPECT[p.id][d]]}</td>`).join('')}</tr>`).join('');
+
+/* ============ database view ============ */
+function renderDB(){
+  $('db').innerHTML = db.map((c,i) => { const bad = looksBad(c.text);
+    return `<div class="rec ${bad?'bad':''}"><span class="k">#${i+1} name=</span><span class="v">${esc(c.name)}</span><br><span class="k">text=</span><span class="v">${esc(c.text)}</span>${bad?'<br><span class="flag">⚠ contains HTML / event handler</span>':''}</div>`; }).join('');
+}
+
+/* ============ the victim page (built fresh for every visit) ============ */
+function victimDoc(){
+  const nonce = Math.random().toString(36).slice(2);
+  const data = JSON.stringify({ comments: db, defence, visitor: visitors[vi % visitors.length] }).replace(/</g,'\\u003c');
+  const csp = defence === 'csp' ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'nonce-${nonce}'">` : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${csp}
+<style>body{font-family:Georgia,serif;margin:0;padding:16px;color:#222;background:#fff}h3{margin:0 0 4px;font:700 18px system-ui}small{color:#777;font:12px system-ui}
+.c{border-top:1px solid #eee;padding:10px 0;font-size:14px}.c b{font-family:system-ui}#toast{position:fixed;left:10px;right:10px;bottom:10px;background:#111;color:#fff;font:13px system-ui;padding:10px 12px;border-radius:8px;display:none}</style></head>
+<body><h3>Kigali Tech Blog</h3><small>Post #42 · signed in as <b id="who"></b></small><div id="board"></div><div id="toast"></div>
+<script nonce="${nonce}">
+(function(){
+  var D = ${data};
+  window.FAKE_SESSION = 'sess_' + D.visitor + '_7f3a91c0 (fake demo token)';
+  var send = function(type,msg){ parent.postMessage({ lab:'xss', type:type, msg:String(msg) }, '*'); };
+  var toast = function(m){ var t=document.getElementById('toast'); if(!t){return;} t.textContent=m; t.style.display='block'; };
+  window.alert = function(m){ toast('alert(): ' + m); send('ran','alert() executed: ' + m); };
+  window.leak  = function(v){ toast('Attacker received: ' + v); send('ran','Session token read by attacker script: ' + v); };
+  document.addEventListener('securitypolicyviolation', function(e){ send('csp','CSP blocked ' + e.violatedDirective + (e.sample ? ' → ' + e.sample.slice(0,40) : '')); });
+  new MutationObserver(function(){ if(!document.getElementById('board')) send('ran','Page content was replaced (defacement)'); }).observe(document.body,{childList:true});
+  document.getElementById('who').textContent = D.visitor;
+  var board = document.getElementById('board');
+  function sanitize(html){
+    var doc = new DOMParser().parseFromString('<div>'+html+'</div>','text/html'), ok = {B:1,I:1,EM:1,STRONG:1,A:1,BR:1,P:1};
+    (function walk(n){ Array.from(n.children).forEach(function(el){
+      if(!ok[el.tagName]){ el.replaceWith(document.createTextNode(el.textContent)); return; }
+      Array.from(el.attributes).forEach(function(a){ if(!(el.tagName==='A' && a.name==='href' && /^https?:/i.test(a.value))) el.removeAttribute(a.name); });
+      walk(el); }); })(doc.body.firstChild);
+    return doc.body.firstChild.innerHTML;
+  }
+  D.comments.forEach(function(c){
+    var div = document.createElement('div'); div.className='c';
+    if (D.defence === 'encode') { div.textContent = c.name + ': ' + c.text; }
+    else if (D.defence === 'sanitize') { div.innerHTML = '<b>' + sanitize(c.name) + '</b>: ' + sanitize(c.text); }
+    else { div.innerHTML = '<b>' + c.name + '</b>: ' + c.text; }   /* none + csp: vulnerable innerHTML */
+    board.appendChild(div);
+  });
+  send('rendered', D.defence);
+})();
+<\/script></body></html>`;
+}
+
+let ranThisVisit = false, cspThisVisit = false, lastText = '';
+function visit(){
+  ranThisVisit = false; cspThisVisit = false;
+  const who = visitors[vi % visitors.length];
+  $('visitor').textContent = 'visitor: ' + who;
+  $('victim').srcdoc = victimDoc();
+  setTimeout(updateStatus, 700);
+}
+function updateStatus(){
+  const s = $('status'), hasBad = db.some(c => looksBad(c.text));
+  if (ranThisVisit) { s.className = 'status bad'; s.textContent = '✗ Exploited: the attacker’s code ran in ' + visitors[vi % visitors.length] + '’s browser.'; }
+  else if (cspThisVisit) { s.className = 'status mid'; s.textContent = '◐ CSP blocked the script, but injected HTML/CSS can still change the page.'; }
+  else if (hasBad && (defence === 'encode' || defence === 'sanitize')) { s.className = 'status good'; s.textContent = '✓ Protected: the payload was shown as harmless text or stripped.'; }
+  else if (hasBad) { s.className = 'status mid'; s.textContent = defence === 'csp' ? '◐ No script ran, but CSP does not stop injected HTML/CSS: the page can still be changed or faked.' : '◐ HTML was injected. Nothing ran this time, but the page can be changed.'; }
+  else { s.className = 'status'; s.textContent = 'All comments are plain text.'; }
+}
+addEventListener('message', e => {
+  const d = e.data; if (!d || d.lab !== 'xss') return;
+  if (d.type === 'ran') { ranThisVisit = true; log('bad', '✗ ' + d.msg); updateStatus(); }
+  else if (d.type === 'csp') { cspThisVisit = true; log('mid', '◐ ' + d.msg); updateStatus(); }
+  else if (d.type === 'rendered') log('info', `Page rendered for ${visitors[vi % visitors.length]} with defence: ${({none:'none (innerHTML)',encode:'output encoding',sanitize:'allowlist sanitizer',csp:'CSP + innerHTML'})[d.msg]}`);
+});
+
+/* ============ controls ============ */
+$('post').onclick = () => {
+  const text = $('msg').value.trim(), name = $('name').value.trim() || 'anon';
+  if (!text) return;
+  db.push({ name, text }); renderDB();
+  log(looksBad(text) ? 'mid' : 'ok', `Stored comment from “${name}”${looksBad(text) ? ' (contains HTML/handlers)' : ''}.`);
+  visit();
+};
+$('reset').onclick = () => { db = seed(); vi = 0; renderDB(); log('ok', 'Board reset to clean comments.'); visit(); };
+$('revisit').onclick = () => { vi++; log('info', `A different user (${visitors[vi % visitors.length]}) opens the same page…`); visit(); };
+document.querySelectorAll('.def').forEach(b => b.onclick = () => {
+  defence = b.dataset.d; document.querySelectorAll('.def').forEach(x => x.setAttribute('aria-pressed', x === b));
+  log('info', 'Defence switched → ' + b.textContent.replace(/\s+/g,' ').trim()); visit();
+});
+
+renderDB(); visit();
+log('ok', 'Lab ready. Pick a payload on the left, post it, then try the defences.');
+</script>
+</body>
+</html>
