@@ -1,6 +1,6 @@
 # 🔐 Kai XSS Lab — Stored Cross-Site Scripting, Explained Safely
 
-**Try it live → [hprince01.github.io/projects/xss-lab](https://hprince01.github.io/projects/xss-lab/)**
+**Try it live → [princehirwa.pages.dev/projects/xss-lab](https://princehirwa.pages.dev/projects/xss-lab/)**
 
 An interactive web-security lab that shows **how stored XSS works and how to stop it**, by letting you attack a fake comment board inside a sandbox and then switch on real defences.
 
@@ -30,4 +30,4 @@ Vanilla JavaScript · sandboxed iframes + `srcdoc` · Content-Security-Policy wi
 [OWASP: Cross-Site Scripting](https://owasp.org/www-community/attacks/xss/)
 
 ---
-Built by **Prince Hirwa Rutagengwa · [Kai Labs](https://hprince01.github.io/)** — Kigali, Rwanda.
+Built by **Prince Hirwa Rutagengwa · [Kai Labs](https://princehirwa.pages.dev/)** — Kigali, Rwanda.
